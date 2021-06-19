@@ -107,4 +107,5 @@ ASSYM(RISCV_BOOTPARAMS_KERN_STACK, offsetof(struct riscv_bootparams,
     kern_stack));
 ASSYM(RISCV_BOOTPARAMS_DTBP_VIRT, offsetof(struct riscv_bootparams, dtbp_virt));
 ASSYM(RISCV_BOOTPARAMS_DTBP_PHYS, offsetof(struct riscv_bootparams, dtbp_phys));
+ASSYM(RISCV_BOOTPARAMS_BOOT_HART, offsetof(struct riscv_bootparams, boot_hart));
 ASSYM(RISCV_BOOTPARAMS_MODULEP, offsetof(struct riscv_bootparams, modulep));

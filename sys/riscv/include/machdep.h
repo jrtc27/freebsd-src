@@ -43,6 +43,7 @@ struct riscv_bootparams {
 	vm_offset_t	kern_stack;
 	vm_offset_t	dtbp_virt;	/* Device tree blob virtual addr */
 	vm_offset_t	dtbp_phys;	/* Device tree blob physical addr */
+	uint32_t	boot_hart;
 	vm_offset_t	modulep;	/* loader(8) metadata */
 };
 

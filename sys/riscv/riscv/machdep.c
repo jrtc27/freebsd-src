@@ -783,6 +783,10 @@ fake_preload_metadata(struct riscv_bootparams *rvbp)
 	PRELOAD_PUSH_VALUE(uint32_t, sizeof(int));
 	PRELOAD_PUSH_VALUE(int, RB_VERBOSE);
 
+	PRELOAD_PUSH_VALUE(uint32_t, MODINFO_METADATA | MODINFOMD_BOOT_HART);
+	PRELOAD_PUSH_VALUE(uint32_t, sizeof(uint32_t));
+	PRELOAD_PUSH_VALUE(uint32_t, rvbp->boot_hart);
+
 	/* End marker */
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
 	PRELOAD_PUSH_VALUE(uint32_t, 0);
@@ -833,6 +837,7 @@ parse_metadata(void)
 	KASSERT(kmdp != NULL, ("No preload metadata found!"));
 
 	/* Read the boot metadata */
+	boot_hart = MD_FETCH(kmdp, MODINFOMD_BOOT_HART, uint32_t);
 	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
 	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
 	kern_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
@@ -861,10 +866,6 @@ initriscv(struct riscv_bootparams *rvbp)
 	int mem_regions_sz;
 	vm_offset_t lastaddr;
 	vm_size_t kernlen;
-#ifdef FDT
-	phandle_t chosen;
-	uint32_t hart;
-#endif
 	char *env;
 
 	TSRAW(&thread0, TS_ENTER, __func__, NULL);
@@ -889,17 +890,10 @@ initriscv(struct riscv_bootparams *rvbp)
 	}
 	lastaddr = parse_metadata();
 
-#ifdef FDT
 	/*
-	 * Look for the boot hart ID. This was either passed in directly from
-	 * the SBI firmware and handled by locore, or was stored in the device
-	 * tree by an earlier boot stage.
+	 * Check the boot hart ID. This was either passed in directly from the
+	 * SBI firmware and handled by locore, or was passed to us by loader.
 	 */
-	chosen = OF_finddevice("/chosen");
-	if (OF_getencprop(chosen, "boot-hartid", &hart, sizeof(hart)) != -1) {
-		boot_hart = hart;
-	}
-#endif
 	if (boot_hart == BOOT_HART_INVALID) {
 		panic("Boot hart ID was not properly set");
 	}
