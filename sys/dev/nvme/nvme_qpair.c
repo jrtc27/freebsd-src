@@ -591,6 +591,20 @@ nvme_qpair_process_completions(struct nvme_qpair *qpair)
 		if (NVME_STATUS_GET_P(cpl.status) != qpair->phase)
 			break;
 
+		/*
+		 * Re-sync and re-read now we know the completion has the right
+		 * phase, as we need to ensure our reads of cid and sqhd happen
+		 * after the read of status in order to not see stale values
+		 * from before the completion queue entry was filled.
+		 */
+		bus_dmamap_sync(qpair->dma_tag, qpair->queuemem_map,
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+
+		cpl = qpair->cpl[qpair->cq_head];
+
+		/* Convert to host endian */
+		nvme_completion_swapbytes(&cpl);
+
 		tr = qpair->act_tr[cpl.cid];
 
 		if (tr != NULL) {
