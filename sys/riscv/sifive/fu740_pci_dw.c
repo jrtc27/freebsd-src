@@ -132,7 +132,7 @@ fupci_phy_read(struct fupci_softc *sc, int phy, uint32_t reg, uint32_t *val)
 		return (ETIMEDOUT);
 	}
 
-	FUDW_MGMT_WRITE(sc, FUDW_MGMT_PHY_CR_PARA_REG(phy, WRITE_EN), 0);
+	FUDW_MGMT_WRITE(sc, FUDW_MGMT_PHY_CR_PARA_REG(phy, READ_EN), 0);
 
 	timeout = 10;
 	do {
