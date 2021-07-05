@@ -128,10 +128,11 @@ fupci_phy_read(struct fupci_softc *sc, int phy, uint32_t reg, uint32_t *val)
 	} while (--timeout > 0);
 
 	if (timeout == 0) {
-		device_printf(sc->dev, "Timeout waiting for write ACK\n");
+		device_printf(sc->dev, "Timeout waiting for read ACK\n");
 		return (ETIMEDOUT);
 	}
 
+	*val = FUDW_MGMT_READ(sc, FUDW_MGMT_PHY_CR_PARA_REG(phy, READ_DATA));
 	FUDW_MGMT_WRITE(sc, FUDW_MGMT_PHY_CR_PARA_REG(phy, READ_EN), 0);
 
 	timeout = 10;
@@ -143,11 +144,10 @@ fupci_phy_read(struct fupci_softc *sc, int phy, uint32_t reg, uint32_t *val)
 	} while (--timeout > 0);
 
 	if (timeout == 0) {
-		device_printf(sc->dev, "Timeout waiting for write un-ACK\n");
+		device_printf(sc->dev, "Timeout waiting for read un-ACK\n");
 		return (ETIMEDOUT);
 	}
 
-	*val = FUDW_MGMT_READ(sc, FUDW_MGMT_PHY_CR_PARA_REG(phy, READ_DATA));
 	return (0);
 }
 
