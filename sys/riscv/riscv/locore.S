@@ -76,8 +76,9 @@ _alt_start:
 	beqz	t0, 1f
 	j	mpentry
 1:
-	/* Save hart ID */
-	mv	a2, a0
+	/* Store the boot hart */
+	lla	t0, boot_hart
+	sw	a0, 0(t0)
 
 	/* Load zero as modulep */
 	mv	a0, zero
@@ -100,18 +101,15 @@ _start:
 .option pop
 
 	/*
-	 * Zero a1 to indicate that we have no DTB pointer and set a2 to -1 to
-	 * indicate that we have no hart ID. They are already included in the
-	 * loader(8) metadata.
+	 * Zero a1 to indicate that we have no DTB pointer. It is already
+	 * included in the loader(8) metadata.
 	 */
 	mv	a1, zero
-	li	a2, -1
 
 	/*
 	 * Page tables setup
 	 *  a0 - modulep or zero
 	 *  a1 - zero or dtbp
-	 *  a2 - -1 or hart ID
 	 */
 pagetables:
 	/* Get the kernel's load address */
@@ -256,7 +254,6 @@ va:
 	sd	t0, RISCV_BOOTPARAMS_DTBP_VIRT(sp)
 	sd	a1, RISCV_BOOTPARAMS_DTBP_PHYS(sp)
 
-	sw	a2, RISCV_BOOTPARAMS_BOOT_HART(sp)
 	sd	a0, RISCV_BOOTPARAMS_MODULEP(sp)
 
 	mv	a0, sp

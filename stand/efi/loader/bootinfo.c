@@ -60,10 +60,6 @@ __FBSDID("$FreeBSD$");
 #include "geliboot.h"
 #endif
 
-#if defined(__riscv)
-#include <libfdt.h>
-#endif
-
 int bi_load(char *args, vm_offset_t *modulep, vm_offset_t *kernendp,
     bool exit_bs);
 
@@ -325,38 +321,6 @@ bi_load_efi_data(struct preloaded_file *kfp, bool exit_bs)
 
 	if (efifb.fb_addr != 0)
 		file_addmetadata(kfp, MODINFOMD_EFI_FB, sizeof(efifb), &efifb);
-#endif
-
-#if defined(__riscv)
-	struct fdt_header *hdr;
-	int chosen, prop_len;
-	const fdt32_t *prop;
-	uint32_t boot_hart;
-
-	hdr = efi_fdt_get_header();
-	if (hdr == NULL) {
-		printf("%s: Could not get EFI FDT for boot-hartid\n",
-		    __func__);
-		return (EINVAL);
-	}
-
-	chosen = fdt_path_offset(hdr, "/chosen");
-	if (chosen < 0) {
-		printf("%s: Could not get EFI FDT /chosen for boot-hartid\n",
-		    __func__);
-		return (EINVAL);
-	}
-
-	prop = fdt_getprop(hdr, chosen, "boot-hartid", &prop_len);
-	if (prop == NULL || prop_len != sizeof(boot_hart)) {
-		printf("%s: Could not get EFI FDT /chosen/boot-hartid\n",
-		    __func__);
-		return (EINVAL);
-	}
-
-	boot_hart = fdt32_to_cpu(*prop);
-	file_addmetadata(kfp, MODINFOMD_BOOT_HART, sizeof(boot_hart),
-	    &boot_hart);
 #endif
 
 	do_vmap = true;

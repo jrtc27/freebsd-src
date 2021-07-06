@@ -147,7 +147,4 @@ bool efi_guid_to_name(EFI_GUID *, char **);
 /* efipart.c */
 int	efipart_inithandles(void);
 
-/* EFI-specific FDT functions */
-struct fdt_header *efi_fdt_get_header(void);
-
 #endif	/* _LOADER_EFILIB_H */

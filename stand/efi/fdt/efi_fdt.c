@@ -40,18 +40,12 @@ __FBSDID("$FreeBSD$");
 
 static EFI_GUID fdtdtb = FDT_TABLE_GUID;
 
-struct fdt_header *
-efi_fdt_get_header(void)
-{
-	return (efi_get_table(&fdtdtb));
-}
-
 int
 fdt_platform_load_dtb(void)
 {
 	struct fdt_header *hdr;
 
-	hdr = efi_fdt_get_header();
+	hdr = efi_get_table(&fdtdtb);
 	if (hdr == NULL)
 		return (1);
 	if (fdt_load_dtb_addr(hdr) != 0)
