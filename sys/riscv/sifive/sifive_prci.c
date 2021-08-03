@@ -241,7 +241,7 @@ static struct prci_div_def fu740_div_clks[] = {
 
 /* FU740 gated clocks */
 static struct prci_gate_def fu740_gate_clks[] = {
-	GATE(FU740_PRCI_PCIEAUXCLK, "pcieauxclk", "hfpclk", FU740_PRCI_PCIEAUX_GATE),
+	GATE(FU740_PRCI_PCIEAUXCLK, "pcieauxclk", "hfclk", FU740_PRCI_PCIEAUX_GATE),
 	GATE_END
 };
 
@@ -507,7 +507,7 @@ prci_attach(device_t dev)
 		prci_pll_register(sc, &clkdef, pll_clk->reg);
 	}
 
-	if (cfg->div_clks) {
+	if (cfg->div_clks != NULL) {
 		bzero(&clkdef_div, sizeof(clkdef_div));
 		for (div_clk = cfg->div_clks; div_clk->name; div_clk++) {
 			clkdef_div.id = div_clk->id;
@@ -519,7 +519,7 @@ prci_attach(device_t dev)
 		}
 	}
 
-	if (cfg->gate_clks) {
+	if (cfg->gate_clks != NULL) {
 		bzero(&clkdef_gate, sizeof(clkdef_gate));
 		for (gate_clk = cfg->gate_clks; gate_clk->name; gate_clk++) {
 			clkdef_gate.clkdef.id = gate_clk->id;
