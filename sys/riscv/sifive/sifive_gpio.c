@@ -156,8 +156,7 @@ sfgpio_attach(device_t dev)
 		sc->gpio_pins[i].gp_flags =
 		    ((input_en & (1u << i)) ? GPIO_PIN_INPUT : 0) |
 		    ((output_en & (1u << i)) ? GPIO_PIN_OUTPUT : 0);
-		snprintf(sc->gpio_pins[i].gp_name, GPIOMAXNAME,
-		    "sifive_gpio%d.%d", device_get_unit(dev), i);
+		snprintf(sc->gpio_pins[i].gp_name, GPIOMAXNAME, "GPIO%d", i);
 		sc->gpio_pins[i].gp_name[GPIOMAXNAME - 1] = '\0';
 	}
 
@@ -209,24 +208,19 @@ static int
 sfgpio_pin_set(device_t dev, uint32_t pin, unsigned int val)
 {
 	struct sfgpio_softc *sc;
-	int i;
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
 	reg = SFGPIO_READ(sc, SFGPIO_OUTPUT_VAL);
 	if (val)
-		reg |= (1u << i);
+		reg |= (1u << pin);
 	else
-		reg &= ~(1u << i);
+		reg &= ~(1u << pin);
 	SFGPIO_WRITE(sc, SFGPIO_OUTPUT_VAL, reg);
 	SFGPIO_UNLOCK(sc);
 
@@ -237,19 +231,19 @@ static int
 sfgpio_pin_get(device_t dev, uint32_t pin, unsigned int *val)
 {
 	struct sfgpio_softc *sc;
-	int i;
+	uint32_t reg;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
-	*val = (SFGPIO_READ(sc, SFGPIO_INPUT_VAL) & (1u << i)) ? 1 : 0;
+	if (sc->gpio_pins[pin].gp_flags & GPIO_PIN_OUTPUT)
+		reg = SFGPIO_READ(sc, SFGPIO_OUTPUT_VAL);
+	else
+		reg = SFGPIO_READ(sc, SFGPIO_INPUT_VAL);
+	*val = (reg & (1u << pin)) ? 1 : 0;
 	SFGPIO_UNLOCK(sc);
 
 	return (0);
@@ -259,21 +253,16 @@ static int
 sfgpio_pin_toggle(device_t dev, uint32_t pin)
 {
 	struct sfgpio_softc *sc;
-	int i;
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
 	reg = SFGPIO_READ(sc, SFGPIO_OUTPUT_VAL);
-	reg ^= (1u << i);
+	reg ^= (1u << pin);
 	SFGPIO_WRITE(sc, SFGPIO_OUTPUT_VAL, reg);
 	SFGPIO_UNLOCK(sc);
 
@@ -284,19 +273,14 @@ static int
 sfgpio_pin_getcaps(device_t dev, uint32_t pin, uint32_t *caps)
 {
 	struct sfgpio_softc *sc;
-	int i;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
-	*caps = sc->gpio_pins[i].gp_caps;
+	*caps = sc->gpio_pins[pin].gp_caps;
 	SFGPIO_UNLOCK(sc);
 
 	return (0);
@@ -306,19 +290,14 @@ static int
 sfgpio_pin_getflags(device_t dev, uint32_t pin, uint32_t *flags)
 {
 	struct sfgpio_softc *sc;
-	int i;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
-	*flags = sc->gpio_pins[i].gp_flags;
+	*flags = sc->gpio_pins[pin].gp_flags;
 	SFGPIO_UNLOCK(sc);
 
 	return (0);
@@ -328,19 +307,14 @@ static int
 sfgpio_pin_getname(device_t dev, uint32_t pin, char *name)
 {
 	struct sfgpio_softc *sc;
-	int i;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
-	memcpy(name, sc->gpio_pins[i].gp_name, GPIOMAXNAME);
+	memcpy(name, sc->gpio_pins[pin].gp_name, GPIOMAXNAME);
 	SFGPIO_UNLOCK(sc);
 
 	return (0);
@@ -350,33 +324,102 @@ static int
 sfgpio_pin_setflags(device_t dev, uint32_t pin, uint32_t flags)
 {
 	struct sfgpio_softc *sc;
-	int i;
 	uint32_t reg;
 
 	sc = device_get_softc(dev);
-	for (i = 0; i < sc->npins; ++i) {
-		if (sc->gpio_pins[i].gp_pin == pin)
-			break;
-	}
 
-	if (i >= sc->npins)
+	if (pin >= sc->npins)
 		return (EINVAL);
 
 	SFGPIO_LOCK(sc);
 
 	reg = SFGPIO_READ(sc, SFGPIO_INPUT_EN);
-	if (flags & GPIO_PIN_INPUT)
-		reg |= (1u << i);
-	else
-		reg &= ~(1u << i);
+	if (flags & GPIO_PIN_INPUT) {
+		reg |= (1u << pin);
+		sc->gpio_pins[pin].gp_flags |= GPIO_PIN_INPUT;
+	} else {
+		reg &= ~(1u << pin);
+		sc->gpio_pins[pin].gp_flags &= ~GPIO_PIN_INPUT;
+	}
 	SFGPIO_WRITE(sc, SFGPIO_INPUT_EN, reg);
 
 	reg = SFGPIO_READ(sc, SFGPIO_OUTPUT_EN);
-	if (flags & GPIO_PIN_OUTPUT)
-		reg |= (1u << i);
-	else
-		reg &= ~(1u << i);
+	if (flags & GPIO_PIN_OUTPUT) {
+		reg |= (1u << pin);
+		sc->gpio_pins[pin].gp_flags |= GPIO_PIN_OUTPUT;
+	} else {
+		reg &= ~(1u << pin);
+		sc->gpio_pins[pin].gp_flags &= ~GPIO_PIN_OUTPUT;
+	}
 	SFGPIO_WRITE(sc, SFGPIO_OUTPUT_EN, reg);
+
+	SFGPIO_UNLOCK(sc);
+
+	return (0);
+}
+
+static int
+sfgpio_pin_access_32(device_t dev, uint32_t first_pin, uint32_t clear_pins,
+    uint32_t change_pins, uint32_t *orig_pins)
+{
+	struct sfgpio_softc *sc;
+	uint32_t reg;
+
+	if (first_pin != 0)
+		return (EINVAL);
+
+	sc = device_get_softc(dev);
+
+	SFGPIO_LOCK(sc);
+
+	reg = SFGPIO_READ(sc, SFGPIO_OUTPUT_VAL);
+
+	if (orig_pins != NULL)
+		/* Only input_val is implicitly masked by input_en */
+		*orig_pins = SFGPIO_READ(sc, SFGPIO_INPUT_VAL) |
+		     (reg & SFGPIO_READ(sc, SFGPIO_OUTPUT_EN));
+
+	if ((clear_pins | change_pins) != 0)
+		SFGPIO_WRITE(sc, SFGPIO_OUTPUT_VAL,
+		    (reg & ~clear_pins) ^ change_pins);
+
+	SFGPIO_UNLOCK(sc);
+
+	return (0);
+}
+
+static int
+sfgpio_pin_config_32(device_t dev, uint32_t first_pin, uint32_t num_pins,
+    uint32_t *pin_flags)
+{
+	struct sfgpio_softc *sc;
+	uint32_t ireg, oreg;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	if (first_pin != 0 || num_pins > sc->npins)
+		return (EINVAL);
+
+	SFGPIO_LOCK(sc);
+
+	ireg = SFGPIO_READ(sc, SFGPIO_INPUT_EN);
+	oreg = SFGPIO_READ(sc, SFGPIO_OUTPUT_EN);
+	for (i = 0; i < num_pins; ++i) {
+		if (pin_flags[i] & GPIO_PIN_INPUT) {
+			ireg |= (1u << i);
+			oreg &= ~(1u << i);
+			sc->gpio_pins[i].gp_flags |= GPIO_PIN_INPUT;
+			sc->gpio_pins[i].gp_flags &= ~GPIO_PIN_OUTPUT;
+		} else if (pin_flags[i] & GPIO_PIN_OUTPUT) {
+			ireg &= ~(1u << i);
+			oreg |= (1u << i);
+			sc->gpio_pins[i].gp_flags &= ~GPIO_PIN_INPUT;
+			sc->gpio_pins[i].gp_flags |= GPIO_PIN_OUTPUT;
+		}
+	}
+	SFGPIO_WRITE(sc, SFGPIO_INPUT_EN, ireg);
+	SFGPIO_WRITE(sc, SFGPIO_OUTPUT_EN, oreg);
 
 	SFGPIO_UNLOCK(sc);
 
@@ -404,6 +447,8 @@ static device_method_t sfgpio_methods[] = {
 	DEVMETHOD(gpio_pin_getflags,	sfgpio_pin_getflags),
 	DEVMETHOD(gpio_pin_getname,	sfgpio_pin_getname),
 	DEVMETHOD(gpio_pin_setflags,	sfgpio_pin_setflags),
+	DEVMETHOD(gpio_pin_access_32,	sfgpio_pin_access_32),
+	DEVMETHOD(gpio_pin_config_32,	sfgpio_pin_config_32),
 
 	/* ofw_bus interface */
 	DEVMETHOD(ofw_bus_get_node,	sfgpio_get_node),
