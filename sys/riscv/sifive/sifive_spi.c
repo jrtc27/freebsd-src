@@ -91,7 +91,7 @@ struct sfspi_softc {
 
 /*
  * Register offsets.
- * From Sifive-Unleashed-SF540-C000-v1.0.pdf page 101.
+ * From Sifive-Unleashed-FU540-C000-v1.0.pdf page 101.
  */
 #define	SFSPI_REG_SCKDIV	0x00 /* Serial clock divisor */
 #define	SFSPI_REG_SCKMODE	0x04 /* Serial clock mode */
@@ -331,7 +331,7 @@ sfspi_attach(device_t dev)
 	}
 
 	/*
-	 * From Sifive-Unleashed-SF540-C000-v1.0.pdf page 103:
+	 * From Sifive-Unleashed-FU540-C000-v1.0.pdf page 103:
 	 * csdef is cs_width bits wide and all ones on reset.
 	 */
 	sc->cs_max = SFSPI_READ(sc, SFSPI_REG_CSDEF);
