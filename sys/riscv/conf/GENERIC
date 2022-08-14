@@ -141,6 +141,7 @@ device		kbdmux
 
 # RTC
 device		goldfish_rtc	# QEMU RTC
+device		da9063_rtc	# Dialog Semiconductor DA9063 RTC
 
 # Ethernet drivers
 device		cgem		# Cadence GEM Gigabit Ethernet device
@@ -157,6 +158,9 @@ device		gpio
 # SPI
 device		spibus
 device		spigen
+
+# Power management controllers
+device		da9063		# Dialog Semiconductor DA9063 PMIC
 
 # Uncomment for memory disk
 # options 	MD_ROOT
