@@ -96,6 +96,7 @@ SUBDIR=	\
 	ctl \
 	${_cxgb} \
 	${_cxgbe} \
+	da9063 \
 	dc \
 	dcons \
 	dcons_crom \
