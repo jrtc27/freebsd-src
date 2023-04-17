@@ -55,6 +55,10 @@ __FBSDID("$FreeBSD$");
 #define	min(A,B)		((A) < (B) ? (A) : (B))
 #define	max(A,B)		((A) > (B) ? (A) : (B))
 
+static Elf	*pmcstat_image_open_debuglink(struct pmcstat_image *image,
+		    struct pmcstat_args *args, const char *path, Elf_Scn *scn,
+		    char *buffer_debug, int *pdfd, GElf_Ehdr *pdeh);
+
 /*
  * Add the list of symbols in the given section to the list associated
  * with the object.
@@ -339,16 +343,31 @@ error:
 
 static bool
 pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
-    const char *path, Elf *e, uintptr_t *pminva, uintptr_t *pmaxva)
+    struct pmcstat_args *args, const char *path, Elf *e, uintptr_t *pminva,
+    uintptr_t *pmaxva)
 {
-	size_t i, nsh;
+	int dfd;
+	size_t i, nsh, strndx;
 	uintptr_t minva, maxva;
 	Elf_Scn *scn;
 	GElf_Shdr sh;
+	const char *scnname;
+	Elf *de;
+	GElf_Ehdr deh;
+	char buffer_debug[PATH_MAX];
+
+	dfd = -1;
 
 	if (elf_getshnum(e, &nsh) == 0) {
 		warnx(
 "WARNING: Could not determine the number of sections for \"%s\": %s.",
+		    path, elf_errmsg(-1));
+		goto error;
+	}
+
+	if (elf_getshdrstrndx(e, &strndx) != 0) {
+		warnx(
+"WARNING: Could not determine the section name string table for \"%s\": %s.",
 		    path, elf_errmsg(-1));
 		goto error;
 	}
@@ -367,8 +386,27 @@ pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
 			minva = min(minva, sh.sh_addr);
 			maxva = max(maxva, sh.sh_addr + sh.sh_size);
 		}
-		if (sh.sh_type == SHT_SYMTAB || sh.sh_type == SHT_DYNSYM)
+		if (sh.sh_type == SHT_SYMTAB || sh.sh_type == SHT_DYNSYM) {
 			pmcstat_image_add_symbols(image, e, scn, &sh);
+			continue;
+		}
+		if ((scnname = elf_strptr(e, strndx, sh.sh_name)) == NULL) {
+			warnx(
+"WARNING: Could not retrieve name for section header #%zu in \"%s\": %s.",
+			    i, path, elf_errmsg(-1));
+			goto error;
+		}
+		if (strcmp(scnname, ".gnu_debuglink") == 0)
+			de = pmcstat_image_open_debuglink(image, args, path,
+			    scn, buffer_debug, &dfd, &deh);
+	}
+
+	if (de != NULL) {
+		/* Ignore failure; can still use the binary itself */
+		(void) pmcstat_image_scan_elf_sections(image, args,
+		    buffer_debug, de, NULL, NULL);
+		(void) elf_end(de);
+		(void) close(dfd);
 	}
 
 	if (pminva != NULL)
@@ -379,7 +417,29 @@ pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
 	return (true);
 
 error:
+	if (dfd >= 0)
+		(void) close(dfd);
 	return (false);
+}
+
+static Elf *
+pmcstat_image_open_debuglink(struct pmcstat_image *image,
+    struct pmcstat_args *args, const char *path, Elf_Scn *scn,
+    char *buffer_debug, int *pdfd, GElf_Ehdr *pdeh)
+{
+#ifdef notyet
+	Elf *de;
+	e = pmcstat_image_open_elf(image, args, buffer, fd, &eh);
+#else
+	(void) image;
+	(void) args;
+	(void) path;
+	(void) scn;
+	(void) buffer_debug;
+	(void) pdfd;
+	(void) pdeh;
+	return (NULL);
+#endif
 }
 
 /*
@@ -493,7 +553,8 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 	 * Get the min and max VA associated with this ELF object and add
 	 * symbol information.
 	 */
-	if (!pmcstat_image_scan_elf_sections(image, buffer, e, &minva, &maxva))
+	if (!pmcstat_image_scan_elf_sections(image, args, buffer, e, &minva,
+	    &maxva))
 		goto done;
 
 	image->pi_start = minva;
