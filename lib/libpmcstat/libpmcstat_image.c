@@ -292,6 +292,96 @@ pmcstat_image_get_aout_params(struct pmcstat_image *image,
 	return;
 }
 
+static Elf *
+pmcstat_image_open_elf(struct pmcstat_image *image,
+    struct pmcstat_args *args, const char *path, int fd,
+    GElf_Ehdr *peh)
+{
+	Elf *e;
+	GElf_Ehdr eh;
+
+	if ((e = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
+		warnx("WARNING: Cannot read \"%s\".",
+		    path);
+		goto error;
+	}
+
+	if (elf_kind(e) != ELF_K_ELF) {
+		if (args->pa_verbosity >= 2)
+			warnx("WARNING: Cannot determine the type of \"%s\".",
+			    path);
+		goto error;
+	}
+
+	if (gelf_getehdr(e, &eh) != &eh) {
+		warnx(
+		    "WARNING: Cannot retrieve the ELF Header for \"%s\": %s.",
+		    path, elf_errmsg(-1));
+		goto error;
+	}
+
+	if (eh.e_type != ET_EXEC && eh.e_type != ET_DYN &&
+	    !(image->pi_iskernelmodule && eh.e_type == ET_REL)) {
+		warnx("WARNING: \"%s\" is of an unsupported ELF type.",
+		    path);
+		goto error;
+	}
+
+	if (peh != NULL)
+		*peh = eh;
+	return (e);
+
+error:
+	if (e != NULL)
+		(void) elf_end(e);
+	return (NULL);
+}
+
+static bool
+pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
+    const char *path, Elf *e, uintptr_t *pminva, uintptr_t *pmaxva)
+{
+	size_t i, nsh;
+	uintptr_t minva, maxva;
+	Elf_Scn *scn;
+	GElf_Shdr sh;
+
+	if (elf_getshnum(e, &nsh) == 0) {
+		warnx(
+"WARNING: Could not determine the number of sections for \"%s\": %s.",
+		    path, elf_errmsg(-1));
+		goto error;
+	}
+
+	minva = ~(uintptr_t) 0;
+	maxva = (uintptr_t) 0;
+	for (i = 0; i < nsh; i++) {
+		if ((scn = elf_getscn(e, i)) == NULL ||
+		    gelf_getshdr(scn, &sh) != &sh) {
+			warnx(
+"WARNING: Could not retrieve section header #%ju in \"%s\": %s.",
+			    (uintmax_t) i, path, elf_errmsg(-1));
+			goto error;
+		}
+		if (sh.sh_flags & SHF_EXECINSTR) {
+			minva = min(minva, sh.sh_addr);
+			maxva = max(maxva, sh.sh_addr + sh.sh_size);
+		}
+		if (sh.sh_type == SHT_SYMTAB || sh.sh_type == SHT_DYNSYM)
+			pmcstat_image_add_symbols(image, e, scn, &sh);
+	}
+
+	if (pminva != NULL)
+		*pminva = minva;
+	if (pmaxva != NULL)
+		*pmaxva = maxva;
+
+	return (true);
+
+error:
+	return (false);
+}
+
 /*
  * Examine an ELF file to determine the size of its text segment.
  * Sets image->pi_type if anything conclusive can be determined about
@@ -303,23 +393,21 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
     struct pmcstat_args *args)
 {
 	int fd;
-	size_t i, nph, nsh;
+	size_t i, nph;
 	const char *path, *elfbase;
 	char *p, *endp;
 	bool first_exec_segment;
-	uintfptr_t minva, maxva;
+	uintptr_t minva, maxva;
 	Elf *e;
-	Elf_Scn *scn;
 	GElf_Ehdr eh;
 	GElf_Phdr ph;
-	GElf_Shdr sh;
 	enum pmcstat_image_type image_type;
 	char buffer[PATH_MAX];
 
 	assert(image->pi_type == PMCSTAT_IMAGE_UNKNOWN);
 
-	image->pi_start = minva = ~(uintfptr_t) 0;
-	image->pi_end = maxva = (uintfptr_t) 0;
+	image->pi_start = ~(uintptr_t) 0;
+	image->pi_end = (uintptr_t) 0;
 	image->pi_type = image_type = PMCSTAT_IMAGE_INDETERMINABLE;
 	image->pi_isdynamic = 0;
 	image->pi_dynlinkerpath = NULL;
@@ -347,32 +435,9 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 		goto done;
 	}
 
-	if ((e = elf_begin(fd, ELF_C_READ, NULL)) == NULL) {
-		warnx("WARNING: Cannot read \"%s\".",
-		    buffer);
+	e = pmcstat_image_open_elf(image, args, buffer, fd, &eh);
+	if (e == NULL)
 		goto done;
-	}
-
-	if (elf_kind(e) != ELF_K_ELF) {
-		if (args->pa_verbosity >= 2)
-			warnx("WARNING: Cannot determine the type of \"%s\".",
-			    buffer);
-		goto done;
-	}
-
-	if (gelf_getehdr(e, &eh) != &eh) {
-		warnx(
-		    "WARNING: Cannot retrieve the ELF Header for \"%s\": %s.",
-		    buffer, elf_errmsg(-1));
-		goto done;
-	}
-
-	if (eh.e_type != ET_EXEC && eh.e_type != ET_DYN &&
-	    !(image->pi_iskernelmodule && eh.e_type == ET_REL)) {
-		warnx("WARNING: \"%s\" is of an unsupported ELF type.",
-		    buffer);
-		goto done;
-	}
 
 	image_type = eh.e_ident[EI_CLASS] == ELFCLASS32 ?
 	    PMCSTAT_IMAGE_ELF32 : PMCSTAT_IMAGE_ELF64;
@@ -425,30 +490,11 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 	}
 
 	/*
-	 * Get the min and max VA associated with this ELF object.
+	 * Get the min and max VA associated with this ELF object and add
+	 * symbol information.
 	 */
-	if (elf_getshnum(e, &nsh) == 0) {
-		warnx(
-"WARNING: Could not determine the number of sections for \"%s\": %s.",
-		    buffer, elf_errmsg(-1));
+	if (!pmcstat_image_scan_elf_sections(image, buffer, e, &minva, &maxva))
 		goto done;
-	}
-
-	for (i = 0; i < nsh; i++) {
-		if ((scn = elf_getscn(e, i)) == NULL ||
-		    gelf_getshdr(scn, &sh) != &sh) {
-			warnx(
-"WARNING: Could not retrieve section header #%ju in \"%s\": %s.",
-			    (uintmax_t) i, buffer, elf_errmsg(-1));
-			goto done;
-		}
-		if (sh.sh_flags & SHF_EXECINSTR) {
-			minva = min(minva, sh.sh_addr);
-			maxva = max(maxva, sh.sh_addr + sh.sh_size);
-		}
-		if (sh.sh_type == SHT_SYMTAB || sh.sh_type == SHT_DYNSYM)
-			pmcstat_image_add_symbols(image, e, scn, &sh);
-	}
 
 	image->pi_start = minva;
 	image->pi_end   = maxva;
@@ -463,7 +509,7 @@ pmcstat_image_get_elf_params(struct pmcstat_image *image,
 			endp = p+1;
 	image->pi_name = pmcstat_string_intern(endp);
 
- done:
+done:
 	(void) elf_end(e);
 	if (fd >= 0)
 		(void) close(fd);
