@@ -57,7 +57,8 @@ __FBSDID("$FreeBSD$");
 
 static Elf	*pmcstat_image_open_debuglink(struct pmcstat_image *image,
 		    struct pmcstat_args *args, const char *path, Elf_Scn *scn,
-		    char *buffer_debug, int *pdfd, GElf_Ehdr *pdeh);
+		    char *buffer_debug, size_t buffer_debug_size, int *pdfd,
+		    GElf_Ehdr *pdeh);
 
 /*
  * Add the list of symbols in the given section to the list associated
@@ -396,17 +397,15 @@ pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
 			    i, path, elf_errmsg(-1));
 			goto error;
 		}
-		if (strcmp(scnname, ".gnu_debuglink") == 0)
-			de = pmcstat_image_open_debuglink(image, args, path,
-			    scn, buffer_debug, &dfd, &deh);
-	}
-
-	if (de != NULL) {
-		/* Ignore failure; can still use the binary itself */
-		(void) pmcstat_image_scan_elf_sections(image, args,
-		    buffer_debug, de, NULL, NULL);
-		(void) elf_end(de);
-		(void) close(dfd);
+		if (strcmp(scnname, ".gnu_debuglink") == 0 &&
+		    (de = pmcstat_image_open_debuglink(image, args, path, scn,
+		    buffer_debug, sizeof(buffer_debug), &dfd, &deh)) != NULL) {
+			/* Ignore failure; binary itself still usable */
+			(void) pmcstat_image_scan_elf_sections(image, args,
+			    buffer_debug, de, NULL, NULL);
+			(void) elf_end(de);
+			(void) close(dfd);
+		}
 	}
 
 	if (pminva != NULL)
@@ -417,29 +416,36 @@ pmcstat_image_scan_elf_sections(struct pmcstat_image *image,
 	return (true);
 
 error:
-	if (dfd >= 0)
-		(void) close(dfd);
 	return (false);
 }
 
 static Elf *
 pmcstat_image_open_debuglink(struct pmcstat_image *image,
     struct pmcstat_args *args, const char *path, Elf_Scn *scn,
-    char *buffer_debug, int *pdfd, GElf_Ehdr *pdeh)
+    char *buffer_debug, size_t buffer_debug_size, int *pdfd,
+    GElf_Ehdr *pdeh)
 {
-#ifdef notyet
+	const char *???;
 	Elf *de;
+	int i;
+
 	e = pmcstat_image_open_elf(image, args, buffer, fd, &eh);
-#else
-	(void) image;
-	(void) args;
-	(void) path;
-	(void) scn;
-	(void) buffer_debug;
-	(void) pdfd;
-	(void) pdeh;
-	return (NULL);
-#endif
+
+	/*
+	 * For FSROOT/path/to/dir/file search (per GDB's documentation):
+	 *
+	 *   1. FSROOT/path/to/dir/debuglink
+	 *
+	 *   2. FSROOT/path/to/dir/.debug/debuglink
+	 *
+	 *   3. FSROOT/usr/lib/debug/path/to/dir/debuglink
+	 *
+	 * where debuglink is the file name in file's .gnu_debuglink,
+	 * typically file.debug.
+	 */
+	for (i = 0; i < 3; ++i) {
+	}
+
 }
 
 /*
