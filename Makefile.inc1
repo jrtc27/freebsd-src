@@ -854,6 +854,9 @@ XCFLAGS+=	${BFLAGS}
 .if ${MK_LIB32} == "yes"
 _LIBCOMPATS+=	32
 .endif
+.if ${MK_LIB64} == "yes"
+_LIBCOMPATS+=	64
+.endif
 .include "Makefile.libcompat"
 
 # META_MODE normally ignores host file changes since every build updates

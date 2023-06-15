@@ -3,7 +3,7 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
-_ALL_LIBCOMPATS:=	32
+_ALL_LIBCOMPATS:=	32 64
 
 .if defined(_LIBCOMPATS)
 COMPAT_ARCH?=	${TARGET_ARCH}
@@ -78,6 +78,34 @@ LIB32_MACHINE_ABI+=	time32
 .else
 LIB32_MACHINE_ABI+=	time64
 .endif
+
+# -------------------------------------------------------------------
+# 64 bit world
+.if ${COMPAT_ARCH} == "amd64"
+HAS_COMPAT+=	64
+.if empty(LIB64CPUTYPE)
+.else
+LIB64CPUFLAGS=	-march=${LIB64CPUTYPE}
+.endif
+.if ${COMPAT_COMPILER_TYPE} == gcc
+.else
+LIB64CPUFLAGS+=	-target x86_64-unknown-freebsd${OS_REVISION}
+.endif
+LIB64_MACHINE=	amd64
+LIB64_MACHINE_ARCH=	amd64
+LIB64WMAKEENV=
+LIB64WMAKEFLAGS=	\
+		AS="${XAS}" \
+		LD="${XLD}"
+.endif
+
+LIB64WMAKEFLAGS+= NM="${XNM}"
+LIB64WMAKEFLAGS+= OBJCOPY="${XOBJCOPY}"
+
+LIB64CFLAGS=	-DCOMPAT_64BIT
+LIB64DTRACE=	${DTRACE}
+LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
+LIB64_MACHINE_ABI=	${MACHINE_ABI}
 
 # -------------------------------------------------------------------
 # In the program linking case, select LIBCOMPAT

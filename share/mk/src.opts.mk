@@ -297,6 +297,12 @@ __DEFAULT_YES_OPTIONS+=LIB32
 .else
 BROKEN_OPTIONS+=LIB32
 .endif
+# LIB64 dummy option is supported on amd64
+.if ${__T} == "amd64"
+__DEFAULT_YES_OPTIONS+=LIB64
+.else
+BROKEN_OPTIONS+=LIB64
+.endif
 # EFI doesn't exist on powerpc (well, officially) and doesn't work on i386
 .if ${__T:Mpowerpc*} || ${__T} == "i386"
 BROKEN_OPTIONS+=EFI

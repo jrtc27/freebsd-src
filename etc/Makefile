@@ -108,6 +108,10 @@ MTREES=		mtree/BSD.root.dist		/		\
 MTREES+=	mtree/BSD.lib32.dist		/usr
 MTREES+=	mtree/BSD.lib32.dist		/usr/lib/debug/usr
 .endif
+.if ${MK_LIB64} != "no"
+MTREES+=	mtree/BSD.lib64.dist		/usr
+MTREES+=	mtree/BSD.lib64.dist		/usr/lib/debug/usr
+.endif
 .if ${MK_TESTS} != "no"
 MTREES+=	mtree/BSD.tests.dist		${TESTSBASE}
 MTREES+=	mtree/BSD.tests.dist		/usr/lib/debug/${TESTSBASE}
