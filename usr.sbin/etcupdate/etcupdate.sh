@@ -215,10 +215,12 @@ build_tree()
 			cp -p $SRCDIR/$file $1/etc/$name || return 1
 		done
 	elif ! [ -n "$nobuild" ]; then
-		(cd $SRCDIR; $make DESTDIR=$destdir distrib-dirs &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make _obj SUBDIR_OVERRIDE=etc &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make everything SUBDIR_OVERRIDE=etc &&
-    MAKEOBJDIRPREFIX=$destdir/usr/obj $make DESTDIR=$destdir distribution) || \
+		(cd $SRCDIR; export MAKEOBJDIRPREFIX=$destdir/usr/obj;
+		    $make _worldtmp &&
+		    $make DESTDIR=$destdir distrib-dirs &&
+		    $make _obj SUBDIR_OVERRIDE=etc &&
+		    $make everything SUBDIR_OVERRIDE=etc &&
+		    $make DESTDIR=$destdir distribution) || \
 		    return 1
 	else
 		(cd $SRCDIR; $make DESTDIR=$destdir distrib-dirs &&
