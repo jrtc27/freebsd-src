@@ -1713,7 +1713,7 @@ prog_cap(struct image_params *imgp, uint64_t perms)
 	    (uintmax_t)prog_base, (uintmax_t)imgp->end_addr, prog_len));
 
 	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
-	    imgp->start_addr - prog_base));
+	    imgp->start_addr));
 }
 
 static void *
@@ -1738,7 +1738,7 @@ interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
 	MPASS(args->base >= interp_base);
 
 	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
-	    args->base - interp_base));
+	    args->base));
 }
 
 static void *
