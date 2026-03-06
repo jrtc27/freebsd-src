@@ -4588,7 +4588,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	KASSERT(cheri_tag_get(item), ("Expect valid capability"));
-	KASSERT(cheri_is_sealed(item), ("Expect unsealed capability"));
+	KASSERT(!cheri_is_sealed(item), ("Expect unsealed capability"));
 	/*
 	 * XXX-AM: Only check non-cache zones as the caches for
 	 * vm_page_t objects have very large bounds from the
@@ -4978,7 +4978,7 @@ zone_free_item(uma_zone_t zone, void *item, void *udata, enum zfreeskip skip)
 {
 #ifdef __CHERI__
 	KASSERT(cheri_tag_get(item), ("Expect valid capability"));
-	KASSERT(cheri_is_sealed(item), ("Expect unsealed capability"));
+	KASSERT(!cheri_is_sealed(item), ("Expect unsealed capability"));
 #endif
 
 	/*
