@@ -318,7 +318,7 @@ SYSCTL_PROC(_vm, OID_AUTO, kstack_cache_size,
  *	Allocate a virtual address range from a domain kstack arena, following
  *	the specified NUMA policy.
  */
-static vm_offset_t
+static vm_pointer_t
 vm_thread_alloc_kstack_kva(vm_size_t size, int domain)
 {
 #ifndef __ILP32__
