@@ -106,7 +106,7 @@ dpcpu_init(void *dpcpu, int cpuid)
 
 	TSENTER();
 	pcpu = pcpu_find(cpuid);
-	pcpu->pc_dynamic = (uintptr_t)dpcpu - DPCPU_START;
+	pcpu->pc_dynamic = (uintptr_t)dpcpu + DPCPU_BIAS;
 
 	/*
 	 * Initialize defaults from our linker section.
